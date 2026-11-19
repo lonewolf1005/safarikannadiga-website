@@ -4,7 +4,8 @@ import {
     addLocation,
     deleteLocation,
     updateLocation,
-    getContinentsList
+    getContinentsList,
+    setCoverPhoto
 } from '@/lib/gallery-cloud';
 import { recordAuditTrail } from '@/lib/audit';
 import { getAuthenticatedUser } from '@/lib/firebase-auth';
@@ -97,7 +98,7 @@ export async function DELETE(req: Request) {
     }
 }
 
-// PATCH: Update location details (description, wildlife, country)
+// PATCH: Update location details (description, wildlife, country, coverImage, focalX, focalY, zoom)
 export async function PATCH(req: Request) {
     const user = await getAuthenticatedUser();
     if (!user) {
@@ -115,13 +116,13 @@ export async function PATCH(req: Request) {
         if (description !== undefined) updates.description = description;
         if (wildlife !== undefined) updates.wildlife = wildlife;
         if (country !== undefined) updates.country = country;
-        if (coverImage !== undefined) updates.coverImage = coverImage;
-        if (focalX !== undefined) updates.focalX = focalX;
-        if (focalY !== undefined) updates.focalY = focalY;
-        if (zoom !== undefined) updates.zoom = zoom;
 
-        if (Object.keys(updates).length === 0) {
-            return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
+        if (coverImage) {
+            await setCoverPhoto(continentSlug, coverImage, locationSlug, {
+                x: focalX ?? 50,
+                y: focalY ?? 50,
+                zoom: zoom ?? 1.0,
+            });
         }
 
         const result = await updateLocation(continentSlug, locationSlug, updates);
@@ -129,7 +130,13 @@ export async function PATCH(req: Request) {
         if (result.success) {
             revalidatePath('/', 'layout');
             revalidatePath('/gallery', 'layout');
-            await recordAuditTrail('UPDATE', 'GALLERY', `${continentSlug}-${locationSlug}`, updates);
+            await recordAuditTrail('UPDATE', 'GALLERY', `${continentSlug}-${locationSlug}`, {
+                ...updates,
+                coverImage,
+                focalX,
+                focalY,
+                zoom,
+            });
             return NextResponse.json({ success: true });
         } else {
             return NextResponse.json({ error: result.error }, { status: 400 });

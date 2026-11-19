@@ -25,6 +25,22 @@ export interface GalleryCoverDB {
     updated_at?: string;
 }
 
+export interface GalleryImageDB {
+    file_id: string;
+    file_path: string;
+    url: string;
+    name: string;
+    width?: number;
+    height?: number;
+    size?: number;
+    folder_path: string;
+    continent_name?: string;
+    location_name?: string;
+    country?: string;
+    approved: boolean;
+    created_at?: string;
+}
+
 function toPlainDate(value: unknown): string | undefined {
     if (!value) return undefined;
     if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -230,6 +246,78 @@ export async function updateFeaturedOrder(locationId: string, order: number): Pr
         return { success: true };
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to update featured order';
+        return { success: false, error: message };
+    }
+}
+
+function normalizeGalleryImage(id: string, data: FirebaseFirestore.DocumentData): GalleryImageDB {
+    return {
+        file_id: data.file_id || id,
+        file_path: data.file_path || '',
+        url: data.url || '',
+        name: data.name || '',
+        width: data.width ?? undefined,
+        height: data.height ?? undefined,
+        size: data.size ?? undefined,
+        folder_path: data.folder_path || '',
+        continent_name: data.continent_name || undefined,
+        location_name: data.location_name || undefined,
+        country: data.country || undefined,
+        approved: data.approved ?? true,
+        created_at: toPlainDate(data.created_at),
+    };
+}
+
+/**
+ * Internal direct fetcher (bypasses cache wrapper)
+ */
+async function getGalleryImagesDirect(): Promise<GalleryImageDB[]> {
+    if (!isFirebaseConfigured()) return [];
+
+    const snapshot = await getFirebaseDb().collection('gallery_images').get();
+    return snapshot.docs.map((doc) => normalizeGalleryImage(doc.id, doc.data()));
+}
+
+/**
+ * Persistent data-cached gallery images (valid 1hr) - the source of truth
+ * for "what images exist", replacing live ImageKit folder scans.
+ */
+export const getGalleryImagesFromDB = unstable_cache(
+    async () => getGalleryImagesDirect(),
+    ['gallery-images-db'],
+    {
+        revalidate: 3600,
+        tags: ['gallery']
+    }
+);
+
+export async function addGalleryImageToDB(image: Omit<GalleryImageDB, 'created_at'>): Promise<{ success: boolean; error?: string }> {
+    try {
+        await getFirebaseDb()
+            .collection('gallery_images')
+            .doc(image.file_id)
+            .set({
+                ...image,
+                created_at: FieldValue.serverTimestamp(),
+            }, { merge: true });
+
+        revalidateTag('gallery', 'max');
+        return { success: true };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to record gallery image';
+        console.error('Error adding gallery image:', error);
+        return { success: false, error: message };
+    }
+}
+
+export async function deleteGalleryImageFromDB(fileId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        await getFirebaseDb().collection('gallery_images').doc(fileId).delete();
+        revalidateTag('gallery', 'max');
+        return { success: true };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to delete gallery image record';
+        console.error('Error deleting gallery image:', error);
         return { success: false, error: message };
     }
 }

@@ -218,7 +218,26 @@ export function GalleryManager({ structure: initialStructure, fetchStructure, se
                 const data = await uploadRes.json();
 
                 if (data.url) {
-                    // 4. Trigger server-side revalidation to clear cache
+                    // 4. Register the uploaded photo record into Firestore database
+                    await fetch('/api/admin/gallery/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            fileId: data.fileId,
+                            filePath: data.filePath,
+                            url: data.url,
+                            name: data.name || file.name,
+                            folderPath: folderPath,
+                            continentName: activeContinentName,
+                            locationName: activeLocationName,
+                            country: activeLocation?.country,
+                            width: data.width,
+                            height: data.height,
+                            size: data.size || file.size,
+                        }),
+                    });
+
+                    // 5. Trigger server-side revalidation to clear cache
                     await fetch('/api/admin/gallery/revalidate', { method: 'POST' });
 
                     // Update local ghost image with real data immediately
@@ -593,6 +612,24 @@ export function GalleryManager({ structure: initialStructure, fetchStructure, se
         }
     };
 
+    const handleSyncStorage = async () => {
+        setActionLoading('Syncing ImageKit with Database...');
+        try {
+            const res = await fetch('/api/admin/gallery/sync-ik', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                alert(`Sync complete! Registered ${data.added} missing photos out of ${data.total} into the database.`);
+                await fetchStructure();
+            } else {
+                alert(`Sync failed: ${data.error || 'Unknown error'}`);
+            }
+        } catch (e) {
+            alert('Error performing sync.');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
     const openEditModal = () => {
         if (!activeLocation) return;
         setEditForm({
@@ -621,8 +658,20 @@ export function GalleryManager({ structure: initialStructure, fetchStructure, se
                     <h2 className="text-2xl font-bold font-heading text-neutral-charcoal">Gallery Manager</h2>
                     <p className="text-sm text-neutral-gray mt-1">Organize photos by continent and safari destination</p>
                 </div>
-                <div className="text-[10px] md:text-xs font-bold text-safari-gold bg-safari-gold/10 px-4 py-2 rounded-full border border-safari-gold/20 whitespace-nowrap">
-                    {structure.reduce((sum, c) => sum + (c.locations?.reduce((s, l) => s + (l.images?.length || 0), 0) || 0), 0)} TOTAL PHOTOS
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleSyncStorage}
+                        className="text-[10px] md:text-xs font-bold text-forest-green bg-forest-green/10 hover:bg-forest-green/20 px-4 py-2 rounded-full border border-forest-green/20 whitespace-nowrap transition-all flex items-center gap-1.5"
+                        title="Scan ImageKit and sync missing photo records to database"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Sync Storage with DB
+                    </button>
+                    <div className="text-[10px] md:text-xs font-bold text-safari-gold bg-safari-gold/10 px-4 py-2 rounded-full border border-safari-gold/20 whitespace-nowrap">
+                        {structure.reduce((sum, c) => sum + (c.locations?.reduce((s, l) => s + (l.images?.length || 0), 0) || 0), 0)} TOTAL PHOTOS
+                    </div>
                 </div>
             </div>
 

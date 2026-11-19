@@ -217,6 +217,7 @@ export default function ShareExperiencePage() {
                 story: data.story,
                 highlights: data.highlights || null,
                 photos: uploadedUrls,
+                consent: data.consent,
                 custom_spam_trap_website_null: data.custom_spam_trap_website_null || ""
             };
 
@@ -326,8 +327,9 @@ export default function ShareExperiencePage() {
                                         Your Name *
                                     </label>
                                     <input
-                                        {...register("name", { required: "Name is required" })}
+                                        {...register("name", { required: "Name is required", maxLength: { value: 100, message: "Name must be 100 characters or fewer" } })}
                                         placeholder="John Doe"
+                                        maxLength={100}
                                         className={cn(
                                             "w-full bg-neutral-cream rounded-card px-4 py-3 outline-none border-2 transition-all",
                                             errors.name ? "border-red-400" : "border-transparent focus:border-safari-gold"
@@ -431,8 +433,9 @@ export default function ShareExperiencePage() {
                                     Best Wildlife Sightings
                                 </label>
                                 <input
-                                    {...register("highlights")}
+                                    {...register("highlights", { maxLength: { value: 500, message: "Highlights must be 500 characters or fewer" } })}
                                     placeholder="e.g., Tiger, Leopard, Elephant herd, Great Migration..."
+                                    maxLength={500}
                                     className="w-full bg-neutral-cream rounded-card px-4 py-3 outline-none border-2 border-transparent focus:border-safari-gold transition-all"
                                 />
                             </div>
@@ -442,11 +445,13 @@ export default function ShareExperiencePage() {
                                     Your Safari Story *
                                 </label>
                                 <textarea
-                                    {...register("story", { 
-                                        required: "Safari story is required", 
-                                        minLength: { value: 50, message: "Story must be at least 50 characters long" } 
+                                    {...register("story", {
+                                        required: "Safari story is required",
+                                        minLength: { value: 50, message: "Story must be at least 50 characters long" },
+                                        maxLength: { value: 5000, message: "Story must be 5000 characters or fewer" }
                                     })}
                                     rows={6}
+                                    maxLength={5000}
                                     placeholder="Tell us about your experience... What made it special? Any memorable moments?"
                                     className={cn(
                                         "w-full bg-neutral-cream rounded-card px-4 py-3 outline-none border-2 transition-all resize-none",

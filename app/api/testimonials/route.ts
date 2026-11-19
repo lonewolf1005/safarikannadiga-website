@@ -6,6 +6,10 @@ export const maxDuration = 60;
 const MAX_PHOTOS = 5;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_TOTAL_UPLOAD_BYTES = MAX_PHOTOS * MAX_FILE_SIZE_BYTES;
+const MAX_NAME_LENGTH = 100;
+const MAX_SAFARI_LENGTH = 150;
+const MAX_STORY_LENGTH = 5000;
+const MAX_HIGHLIGHTS_LENGTH = 500;
 
 // GET: List approved testimonials (public)
 export async function GET(req: Request) {
@@ -36,10 +40,12 @@ export async function POST(req: Request) {
         let data: TestimonialInput;
         let photos: File[] | string[] = [];
         let customSpamTrap: string | null = null;
+        let consent = false;
 
         if (contentType.includes('application/json')) {
             const body = await req.json();
             customSpamTrap = body.custom_spam_trap_website_null || null;
+            consent = !!body.consent;
             data = {
                 name: body.name,
                 email: body.email,
@@ -64,6 +70,7 @@ export async function POST(req: Request) {
             }
 
             customSpamTrap = formData.get('custom_spam_trap_website_null') as string | null;
+            consent = formData.get('consent') === 'true';
             data = {
                 name: formData.get('name') as string,
                 email: formData.get('email') as string,
@@ -106,9 +113,26 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
+        if (!consent) {
+            return NextResponse.json({ error: 'Consent to publish is required' }, { status: 400 });
+        }
+
         // Validate rating
         if (data.rating < 1 || data.rating > 5) {
             return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 });
+        }
+
+        if (data.name.length > MAX_NAME_LENGTH) {
+            return NextResponse.json({ error: `Name must be ${MAX_NAME_LENGTH} characters or fewer` }, { status: 400 });
+        }
+        if (data.safari.length > MAX_SAFARI_LENGTH) {
+            return NextResponse.json({ error: `Safari name must be ${MAX_SAFARI_LENGTH} characters or fewer` }, { status: 400 });
+        }
+        if (data.story.length > MAX_STORY_LENGTH) {
+            return NextResponse.json({ error: `Story must be ${MAX_STORY_LENGTH} characters or fewer` }, { status: 400 });
+        }
+        if (data.highlights && data.highlights.length > MAX_HIGHLIGHTS_LENGTH) {
+            return NextResponse.json({ error: `Highlights must be ${MAX_HIGHLIGHTS_LENGTH} characters or fewer` }, { status: 400 });
         }
 
         // Limit to 5 photos

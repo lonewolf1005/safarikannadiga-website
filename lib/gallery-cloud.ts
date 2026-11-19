@@ -39,7 +39,11 @@ import {
     getCoversFromDB,
     setCoverInDB,
     deleteCoverFromDB,
-    GalleryLocationDB
+    getGalleryImagesFromDB,
+    addGalleryImageToDB,
+    deleteGalleryImageFromDB,
+    GalleryLocationDB,
+    GalleryImageDB
 } from './firebase-db';
 import {
     isImageKitConfigured,
@@ -302,6 +306,28 @@ export async function getGalleryCovers(): Promise<Record<string, CoverData>> {
 }
 
 /**
+ * Get all gallery images from Firestore (the source of truth for "what
+ * images exist"), shaped like ImageKitFile so existing prefix-filtering
+ * code downstream doesn't need to change.
+ */
+async function getAllGalleryImagesFromFirestore(): Promise<(ImageKitFile & { approved: boolean; location_name?: string; continent_name?: string })[]> {
+    const images = await getGalleryImagesFromDB();
+    return images.map((img: GalleryImageDB) => ({
+        fileId: img.file_id,
+        name: img.name,
+        filePath: img.file_path,
+        url: img.url,
+        thumbnailUrl: img.url,
+        width: img.width || 0,
+        height: img.height || 0,
+        size: img.size || 0,
+        approved: img.approved,
+        location_name: img.location_name,
+        continent_name: img.continent_name,
+    }));
+}
+
+/**
  * Get all gallery images from ImageKit in one recursive call
  */
 async function getAllImagesRecursive(): Promise<GalleryImage[]> {
@@ -368,7 +394,7 @@ const fetchContinentsRawCached = unstable_cache(
         console.log('[Cache Miss] Fetching gallery continents data');
         const config = await getGalleryConfig();
         const savedCovers = await getGalleryCovers();
-        const allGalleryFiles = await listFilesRecursive(GALLERY_ROOT);
+        const allGalleryFiles = (await getAllGalleryImagesFromFirestore()).filter((f) => f.approved !== false);
 
         const continents = config.continents.map((continent: any) => {
             let totalImages = 0;
@@ -383,8 +409,12 @@ const fetchContinentsRawCached = unstable_cache(
                     prefix = `${prefix}/`;
                 }
 
-                // Filter files under this folder prefix in memory
-                const matchingFiles = allGalleryFiles.filter(file => file.filePath.startsWith(prefix));
+                // Filter files under this folder prefix or matching location name
+                const matchingFiles = allGalleryFiles.filter(file =>
+                    file.filePath.startsWith(prefix) ||
+                    (file.location_name && file.location_name.toLowerCase().trim() === loc.name.toLowerCase().trim()) ||
+                    (loc.slug && file.filePath.toLowerCase().includes(`/${loc.slug.toLowerCase()}/`))
+                );
 
                 const images: GalleryImage[] = matchingFiles.map(file => ({
                     src: file.url,
@@ -526,7 +556,24 @@ const fetchLocationImagesCached = unstable_cache(
         if (!location) return [];
 
         const folderPath = getLocationFolderPath(continent.name, location.name, location.country);
-        return await getImageKitImages(folderPath);
+        let prefix = folderPath.startsWith('/') ? folderPath : `/${folderPath}`;
+        if (!prefix.endsWith('/')) prefix = `${prefix}/`;
+
+        const allGalleryFiles = await getAllGalleryImagesFromFirestore();
+        const matchingFiles = allGalleryFiles.filter((file) =>
+            file.approved !== false && (
+                file.filePath.startsWith(prefix) ||
+                (file.location_name && file.location_name.toLowerCase().trim() === location.name.toLowerCase().trim()) ||
+                (location.slug && file.filePath.toLowerCase().includes(`/${location.slug.toLowerCase()}/`))
+            )
+        );
+
+        return matchingFiles.map((file) => ({
+            src: file.url,
+            filename: file.name,
+            alt: file.name.replace(/[-_]/g, ' ').replace(/\.\w+$/, '') || 'Safari photo',
+            publicId: file.fileId,
+        }));
     },
     ['location-images'],
     { revalidate: 3600, tags: ['gallery'] }
@@ -545,7 +592,8 @@ export async function getImages(continentSlug: string, locationSlug: string): Pr
 export async function getFullGalleryStructure() {
     const config = await getGalleryConfig();
     const savedCovers = await getGalleryCovers();
-    const allGalleryFiles = await listFilesRecursive(GALLERY_ROOT);
+    // Admin view shows everything, including any soft-hidden (unapproved) images
+    const allGalleryFiles = await getAllGalleryImagesFromFirestore();
 
     return config.continents.map((continent: any) => ({
         name: continent.name,
@@ -559,8 +607,12 @@ export async function getFullGalleryStructure() {
                 prefix = `${prefix}/`;
             }
 
-            // Filter files under this folder prefix in memory
-            const matchingFiles = allGalleryFiles.filter(file => file.filePath.startsWith(prefix));
+            // Filter files under this folder prefix or matching location name
+            const matchingFiles = allGalleryFiles.filter(file =>
+                file.filePath.startsWith(prefix) ||
+                (file.location_name && file.location_name.toLowerCase().trim() === loc.name.toLowerCase().trim()) ||
+                (loc.slug && file.filePath.toLowerCase().includes(`/${loc.slug.toLowerCase()}/`))
+            );
 
             const images = matchingFiles.map(file => ({
                 src: file.url,
@@ -708,7 +760,8 @@ async function compressImage(buffer: Buffer, fileName: string): Promise<{ data: 
  */
 export async function saveImage(
     folderPath: string,
-    file: File
+    file: File,
+    locationMeta?: { continentName: string; locationName: string; country?: string }
 ): Promise<{ success: boolean; path?: string; url?: string; error?: string }> {
     try {
         const bytes = await file.arrayBuffer();
@@ -722,6 +775,19 @@ export async function saveImage(
         const result = await uploadFile(compressedBuffer, compressedName, folder);
 
         if (result.success) {
+            if (locationMeta && result.fileId && result.filePath && result.url) {
+                await addGalleryImageToDB({
+                    file_id: result.fileId,
+                    file_path: result.filePath,
+                    url: result.url,
+                    name: compressedName,
+                    folder_path: folder.startsWith('/') ? folder : `/${folder}`,
+                    continent_name: locationMeta.continentName,
+                    location_name: locationMeta.locationName,
+                    country: locationMeta.country,
+                    approved: true,
+                });
+            }
             clearCache(); // Clear cache after upload
             return {
                 success: true,
@@ -755,7 +821,10 @@ export async function deleteImage(imagePath: string): Promise<{ success: boolean
         }
 
         const result = await deleteFile(imagePath);
-        if (result.success) clearCache();
+        if (result.success) {
+            await deleteGalleryImageFromDB(imagePath);
+            clearCache();
+        }
         return result;
     } catch (error) {
         console.error('Error deleting from ImageKit:', error);
@@ -1048,8 +1117,114 @@ export async function getFeaturedLocations(limit: number = 4): Promise<FeaturedL
 }
 
 /**
+ * Register an image uploaded directly to ImageKit into Firestore database
+ */
+export async function registerUploadedImage(data: {
+    fileId: string;
+    filePath: string;
+    url: string;
+    name: string;
+    folderPath: string;
+    continentName?: string;
+    locationName?: string;
+    country?: string;
+    width?: number;
+    height?: number;
+    size?: number;
+}): Promise<{ success: boolean; error?: string }> {
+    try {
+        const folder = data.folderPath.startsWith('/') ? data.folderPath : `/${data.folderPath}`;
+        const result = await addGalleryImageToDB({
+            file_id: data.fileId,
+            file_path: data.filePath,
+            url: data.url,
+            name: data.name,
+            folder_path: folder,
+            continent_name: data.continentName,
+            location_name: data.locationName,
+            country: data.country,
+            width: data.width,
+            height: data.height,
+            size: data.size,
+            approved: true,
+        });
+
+        if (result.success) {
+            clearCache();
+        }
+        return result;
+    } catch (error) {
+        console.error('Error registering uploaded image:', error);
+        return { success: false, error: 'Failed to register image in DB' };
+    }
+}
+
+/**
+ * Sync ImageKit storage files with Firestore database records
+ * Scans ImageKit and inserts any missing records into Firestore gallery_images collection.
+ */
+export async function syncImageKitWithFirestore(): Promise<{ success: boolean; added: number; total: number; error?: string }> {
+    if (!isImageKitConfigured() || !isFirebaseConfigured()) {
+        return { success: false, added: 0, total: 0, error: 'ImageKit or Firebase not configured' };
+    }
+
+    try {
+        console.log('[Sync] Starting ImageKit to Firestore sync...');
+        const ikFiles = await listFilesRecursive(GALLERY_ROOT);
+        const dbImages = await getGalleryImagesFromDB();
+        const existingIds = new Set(dbImages.map(img => img.file_id));
+
+        let addedCount = 0;
+
+        for (const file of ikFiles) {
+            if (!existingIds.has(file.fileId)) {
+                const pathParts = file.filePath.split('/').filter(Boolean); // ['safari-gallery', 'Africa', ...]
+                let continentName = undefined;
+                let country = undefined;
+                let locationName = undefined;
+
+                if (pathParts.length >= 4) {
+                    continentName = pathParts[1];
+                    country = pathParts[2];
+                    locationName = pathParts[3];
+                } else if (pathParts.length === 3) {
+                    continentName = pathParts[1];
+                    locationName = pathParts[2];
+                }
+
+                const folderPath = file.filePath.substring(0, file.filePath.lastIndexOf('/'));
+
+                await addGalleryImageToDB({
+                    file_id: file.fileId,
+                    file_path: file.filePath,
+                    url: file.url,
+                    name: file.name,
+                    folder_path: folderPath,
+                    continent_name: continentName,
+                    location_name: locationName,
+                    country: country,
+                    width: file.width,
+                    height: file.height,
+                    size: file.size,
+                    approved: true,
+                });
+                addedCount++;
+            }
+        }
+
+        clearCache();
+        console.log(`[Sync] Completed. Added ${addedCount} new files out of ${ikFiles.length} total.`);
+        return { success: true, added: addedCount, total: ikFiles.length };
+    } catch (error: any) {
+        console.error('[Sync] Error during sync:', error);
+        return { success: false, added: 0, total: 0, error: error?.message || 'Sync failed' };
+    }
+}
+
+/**
  * Initialize - no-op for cloud version
  */
 export function initializeGalleryFolders(): void {
     // No initialization needed for ImageKit
 }
+

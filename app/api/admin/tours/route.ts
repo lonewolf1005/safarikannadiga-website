@@ -9,9 +9,12 @@ import {
     markTourSoldOut,
     TourInput
 } from '@/lib/tours';
-import { saveImage } from '@/lib/gallery-cloud';
 import { recordAuditTrail } from '@/lib/audit';
 import { getAuthenticatedUser } from '@/lib/firebase-auth';
+
+function isValidDateRange(start: string, end: string): boolean {
+    return new Date(end).getTime() >= new Date(start).getTime();
+}
 
 // GET: List all tours
 export async function GET(req: Request) {
@@ -46,21 +49,22 @@ export async function POST(req: Request) {
     }
 
     try {
-        const formData = await req.formData();
+        const body = await req.json();
 
         // Extract tour data
         const tourData: TourInput = {
-            title: formData.get('title') as string,
-            destination: formData.get('destination') as string,
-            start_date: formData.get('start_date') as string,
-            end_date: formData.get('end_date') as string,
-            spots_total: parseInt(formData.get('spots_total') as string) || 12,
-            spots_left: parseInt(formData.get('spots_left') as string) || 12,
-            highlights: JSON.parse(formData.get('highlights') as string || '[]'),
-            description: formData.get('description') as string || null,
-            status: (formData.get('status') as 'upcoming' | 'sold-out' | 'completed' | 'draft') || 'upcoming',
-            featured: formData.get('featured') === 'true',
-            brochure_url: formData.get('brochure_url') as string || null,
+            title: body.title,
+            destination: body.destination,
+            start_date: body.start_date,
+            end_date: body.end_date,
+            spots_total: parseInt(body.spots_total) || 12,
+            spots_left: parseInt(body.spots_left) || 12,
+            highlights: Array.isArray(body.highlights) ? body.highlights : [],
+            description: body.description || null,
+            status: body.status || 'upcoming',
+            featured: !!body.featured,
+            brochure_url: body.brochure_url || null,
+            image_url: body.image_url || null,
         };
 
         // Validate required fields
@@ -68,13 +72,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        // Handle image upload if provided
-        const imageFile = formData.get('image') as File | null;
-        if (imageFile && imageFile.size > 0) {
-            const uploadResult = await saveImage('/tours', imageFile);
-            if (uploadResult.success && uploadResult.url) {
-                tourData.image_url = uploadResult.url;
-            }
+        if (!isValidDateRange(tourData.start_date, tourData.end_date)) {
+            return NextResponse.json({ error: 'End date cannot be before the start date' }, { status: 400 });
+        }
+
+        if (tourData.spots_left > tourData.spots_total) {
+            return NextResponse.json({ error: 'Spots left cannot exceed total spots' }, { status: 400 });
         }
 
         const result = await createTour(tourData);
@@ -104,8 +107,8 @@ export async function PUT(req: Request) {
     }
 
     try {
-        const formData = await req.formData();
-        const id = formData.get('id') as string;
+        const body = await req.json();
+        const id = body.id as string;
 
         if (!id) {
             return NextResponse.json({ error: 'Tour ID required' }, { status: 400 });
@@ -114,25 +117,29 @@ export async function PUT(req: Request) {
         const updates: Partial<TourInput> = {};
 
         // Only include fields that are provided
-        if (formData.has('title')) updates.title = formData.get('title') as string;
-        if (formData.has('destination')) updates.destination = formData.get('destination') as string;
-        if (formData.has('start_date')) updates.start_date = formData.get('start_date') as string;
-        if (formData.has('end_date')) updates.end_date = formData.get('end_date') as string;
-        if (formData.has('spots_total')) updates.spots_total = parseInt(formData.get('spots_total') as string);
-        if (formData.has('spots_left')) updates.spots_left = parseInt(formData.get('spots_left') as string);
-        if (formData.has('highlights')) updates.highlights = JSON.parse(formData.get('highlights') as string);
-        if (formData.has('description')) updates.description = formData.get('description') as string;
-        if (formData.has('status')) updates.status = formData.get('status') as 'upcoming' | 'sold-out' | 'completed' | 'draft';
-        if (formData.has('featured')) updates.featured = formData.get('featured') === 'true';
-        if (formData.has('brochure_url')) updates.brochure_url = formData.get('brochure_url') as string;
+        if ('title' in body) updates.title = body.title;
+        if ('destination' in body) updates.destination = body.destination;
+        if ('start_date' in body) updates.start_date = body.start_date;
+        if ('end_date' in body) updates.end_date = body.end_date;
+        if ('spots_total' in body) updates.spots_total = parseInt(body.spots_total);
+        if ('spots_left' in body) updates.spots_left = parseInt(body.spots_left);
+        if ('highlights' in body) updates.highlights = Array.isArray(body.highlights) ? body.highlights : [];
+        if ('description' in body) updates.description = body.description;
+        if ('status' in body) updates.status = body.status;
+        if ('featured' in body) updates.featured = !!body.featured;
+        if ('brochure_url' in body) updates.brochure_url = body.brochure_url;
+        if (body.image_url) updates.image_url = body.image_url;
 
-        // Handle image upload if provided
-        const imageFile = formData.get('image') as File | null;
-        if (imageFile && imageFile.size > 0) {
-            const uploadResult = await saveImage('/tours', imageFile);
-            if (uploadResult.success && uploadResult.url) {
-                updates.image_url = uploadResult.url;
-            }
+        if (updates.start_date && updates.end_date && !isValidDateRange(updates.start_date, updates.end_date)) {
+            return NextResponse.json({ error: 'End date cannot be before the start date' }, { status: 400 });
+        }
+
+        if (
+            typeof updates.spots_left === 'number' &&
+            typeof updates.spots_total === 'number' &&
+            updates.spots_left > updates.spots_total
+        ) {
+            return NextResponse.json({ error: 'Spots left cannot exceed total spots' }, { status: 400 });
         }
 
         const result = await updateTour(id, updates);

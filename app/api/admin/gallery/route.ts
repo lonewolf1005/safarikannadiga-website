@@ -47,7 +47,7 @@ export async function POST(req: Request) {
         }
 
         const folderPath = getLocationFolderPath(continent, location, country);
-        const result = await saveImage(folderPath, file);
+        const result = await saveImage(folderPath, file, { continentName: continent, locationName: location, country });
 
         if (result.success) {
             revalidatePath('/', 'layout');

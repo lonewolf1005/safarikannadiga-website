@@ -100,26 +100,23 @@ export function ToursAdmin() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (formData.end_date && formData.start_date && formData.end_date < formData.start_date) {
+            alert('End date cannot be before the start date.');
+            return;
+        }
+        if (formData.spots_left > formData.spots_total) {
+            alert('Spots left cannot exceed total spots.');
+            return;
+        }
+
         setSaving(true);
 
         try {
-            const formDataObj = new FormData();
-            formDataObj.append('title', formData.title);
-            formDataObj.append('destination', formData.destination);
-            formDataObj.append('start_date', formData.start_date);
-            formDataObj.append('end_date', formData.end_date);
-            formDataObj.append('spots_total', formData.spots_total.toString());
-            formDataObj.append('spots_left', formData.spots_left.toString());
-            formDataObj.append('highlights', JSON.stringify(formData.highlights.split(',').map(h => h.trim()).filter(h => h)));
-            formDataObj.append('description', formData.description);
-            formDataObj.append('brochure_url', formData.brochure_url);
-            formDataObj.append('status', formData.status);
-            formDataObj.append('featured', formData.featured.toString());
-
             let finalImageFile = imageFile;
 
-            // Prevent Vercel/Netlify payload limits by compressing large files client-side
-            if (imageFile && imageFile.size > 1 * 1024 * 1024) {
+            // Compress large files client-side to stay under ImageKit's upload size limit
+            if (imageFile && imageFile.size > 10 * 1024 * 1024) {
                 try {
                     const objectUrl = URL.createObjectURL(imageFile);
                     const img = new window.Image();
@@ -164,17 +161,58 @@ export function ToursAdmin() {
                 }
             }
 
+            // Upload image directly to ImageKit from the browser, bypassing the
+            // Netlify function payload limit entirely.
+            let imageUrl: string | undefined;
             if (finalImageFile) {
-                formDataObj.append('image', finalImageFile);
+                const authRes = await fetch('/api/admin/gallery/auth');
+                const authData = await authRes.json();
+                if (!authRes.ok) throw new Error('Failed to get upload authorization');
+
+                const ikFormData = new FormData();
+                ikFormData.append('file', finalImageFile);
+                ikFormData.append('fileName', finalImageFile.name);
+                ikFormData.append('publicKey', process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY || '');
+                ikFormData.append('signature', authData.signature);
+                ikFormData.append('expire', authData.expire);
+                ikFormData.append('token', authData.token);
+                ikFormData.append('folder', '/tours');
+                ikFormData.append('useUniqueFileName', 'true');
+
+                const uploadRes = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+                    method: 'POST',
+                    body: ikFormData,
+                });
+
+                if (!uploadRes.ok) {
+                    const errorText = await uploadRes.text();
+                    throw new Error(`Cloud storage rejected the file: ${errorText}`);
+                }
+
+                const uploadData = await uploadRes.json();
+                imageUrl = uploadData.url;
             }
 
-            if (editingTour) {
-                formDataObj.append('id', editingTour.id);
-            }
+            const payload = {
+                id: editingTour?.id,
+                title: formData.title,
+                destination: formData.destination,
+                start_date: formData.start_date,
+                end_date: formData.end_date,
+                spots_total: formData.spots_total,
+                spots_left: formData.spots_left,
+                highlights: formData.highlights.split(',').map(h => h.trim()).filter(h => h),
+                description: formData.description,
+                brochure_url: formData.brochure_url,
+                status: formData.status,
+                featured: formData.featured,
+                image_url: imageUrl,
+            };
 
             const res = await fetch('/api/admin/tours', {
                 method: editingTour ? 'PUT' : 'POST',
-                body: formDataObj,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
             });
 
             if (res.ok) {
@@ -186,7 +224,7 @@ export function ToursAdmin() {
                 alert(data.error || 'Failed to save tour');
             }
         } catch (error) {
-            alert('Error saving tour');
+            alert(error instanceof Error ? error.message : 'Error saving tour');
         } finally {
             setSaving(false);
         }

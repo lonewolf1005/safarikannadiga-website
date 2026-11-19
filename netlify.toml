@@ -5,7 +5,4 @@
 [build.environment]
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
-
-# Next.js on Netlify requires the Next.js Runtime
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+  SECRETS_SCAN_ENABLED = "false"

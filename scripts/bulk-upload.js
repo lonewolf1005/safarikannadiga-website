@@ -64,7 +64,30 @@ function getImageFiles(dir) {
     }
 }
 
-async function uploadFile(file, folder) {
+const admin = require('firebase-admin');
+
+// Initialize Firebase Admin if environment variables exist
+let db = null;
+if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    try {
+        if (!admin.apps.length) {
+            const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: process.env.FIREBASE_PROJECT_ID,
+                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                    privateKey: privateKey,
+                }),
+            });
+        }
+        db = admin.firestore();
+        console.log('Firebase Admin initialized for bulk upload script.');
+    } catch (e) {
+        console.warn('Firebase Admin init warning:', e.message);
+    }
+}
+
+async function uploadFile(file, folder, locInfo) {
     try {
         const fileBuffer = fs.readFileSync(file.path);
         
@@ -74,6 +97,21 @@ async function uploadFile(file, folder) {
             folder: folder,
             useUniqueFileName: false,
         });
+
+        if (db && response.fileId) {
+            const folderPath = folder.startsWith('/') ? folder : `/${folder}`;
+            await db.collection('gallery_images').doc(response.fileId).set({
+                file_id: response.fileId,
+                file_path: response.filePath,
+                url: response.url,
+                name: file.name,
+                folder_path: folderPath,
+                continent_name: locInfo ? locInfo.continent : undefined,
+                location_name: locInfo ? locInfo.location : undefined,
+                approved: true,
+                created_at: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        }
         
         return { success: true, file: file.name, url: response.url };
     } catch (error) {
@@ -81,8 +119,8 @@ async function uploadFile(file, folder) {
     }
 }
 
-async function uploadBatch(files, folder) {
-    return Promise.all(files.map(f => uploadFile(f, folder)));
+async function uploadBatch(files, folder, locInfo) {
+    return Promise.all(files.map(f => uploadFile(f, folder, locInfo)));
 }
 
 async function main() {
@@ -115,7 +153,7 @@ async function main() {
             // Upload in parallel batches
             for (let i = 0; i < images.length; i += PARALLEL_UPLOADS) {
                 const batch = images.slice(i, i + PARALLEL_UPLOADS);
-                const results = await uploadBatch(batch, folder);
+                const results = await uploadBatch(batch, folder, loc);
                 
                 for (const r of results) {
                     if (r.success) {

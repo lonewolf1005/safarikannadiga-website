@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthParams } from '@/lib/imagekit';
+import { getAuthenticatedUser } from '@/lib/firebase-auth';
 
 /**
  * ImageKit Authentication API
@@ -8,6 +9,11 @@ import { getAuthParams } from '@/lib/imagekit';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+    const user = await getAuthenticatedUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     console.log('--- [API] /api/admin/gallery/auth Request ---');
     console.log('Env Check:', {
         hasKey: !!process.env.IMAGEKIT_PRIVATE_KEY,

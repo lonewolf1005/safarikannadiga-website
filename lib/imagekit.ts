@@ -400,11 +400,20 @@ export async function listFilesRecursive(folderPath: string): Promise<ImageKitFi
     }
 
     try {
-        // Fetch all files in the account recursively in one call
-        // Limit is set to 1000 (ImageKit's maximum per page)
-        const response: any = await imagekit.assets.list({
-            limit: 1000,
-        });
+        // ImageKit caps each page at 1000 results, so page through with `skip`
+        // until a short page tells us we've reached the end of the account's files.
+        const PAGE_SIZE = 1000;
+        const allItems: any[] = [];
+        let skip = 0;
+        while (true) {
+            const page: any = await imagekit.assets.list({
+                limit: PAGE_SIZE,
+                skip,
+            });
+            allItems.push(...page);
+            if (page.length < PAGE_SIZE) break;
+            skip += PAGE_SIZE;
+        }
 
         // Ensure folder path starts with / and ends with /
         let prefix = folderPath.startsWith('/') ? folderPath : `/${folderPath}`;
@@ -413,7 +422,7 @@ export async function listFilesRecursive(folderPath: string): Promise<ImageKitFi
         }
 
         // Filter to only include files that start with the prefix
-        return response
+        return allItems
             .filter((item: any) => item.type === 'file' && item.filePath.startsWith(prefix))
             .map((file: any) => ({
                 fileId: file.fileId,
