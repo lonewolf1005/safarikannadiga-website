@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import { syncGoogleReviews, syncFacebookReviews } from '@/lib/review-sync';
 import { revalidateTag } from 'next/cache';
+import { getAuthenticatedUser } from '@/lib/firebase-auth';
 
 export async function POST() {
+    const user = await getAuthenticatedUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const [googleResult, fbResult] = await Promise.all([
             syncGoogleReviews(),

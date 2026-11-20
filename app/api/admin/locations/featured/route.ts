@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { toggleLocationFeatured } from '@/lib/firebase-db';
 import { recordAuditTrail } from '@/lib/audit';
+import { getAuthenticatedUser } from '@/lib/firebase-auth';
 
 /**
  * Toggle featured status of a gallery location
@@ -9,6 +10,11 @@ import { recordAuditTrail } from '@/lib/audit';
  * Body: { locationId: string, isFeatured: boolean }
  */
 export async function PATCH(request: Request) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const body = await request.json();
         const { locationId, isFeatured } = body;
