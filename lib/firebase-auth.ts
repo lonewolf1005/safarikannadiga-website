@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { getFirebaseAdminAuth } from './firebase-admin';
+import { getFirebaseAdminAuth, getFirebaseDb } from './firebase-admin';
 
 export const ADMIN_SESSION_COOKIE = 'firebase-admin-session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
@@ -36,6 +36,15 @@ export async function verifyAdminSessionCookie(sessionCookie?: string): Promise<
 
     try {
         const decoded = await getFirebaseAdminAuth().verifySessionCookie(sessionCookie, true);
+        const email = decoded.email?.toLowerCase();
+        if (!email) return null;
+
+        // Verify active whitelist status in Firestore 'admins' collection to prevent revoked sessions
+        const adminDoc = await getFirebaseDb().collection('admins').doc(email).get();
+        if (!adminDoc.exists) {
+            return null;
+        }
+
         return {
             id: decoded.uid,
             email: decoded.email,

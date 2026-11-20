@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import {
     getAllTestimonials,
     approveTestimonial,
@@ -45,6 +45,8 @@ export async function PATCH(req: Request) {
 
         if (result.success) {
             revalidatePath('/');
+            revalidatePath('/testimonials', 'layout');
+            try { revalidateTag('testimonials', 'max'); } catch {}
             await recordAuditTrail(approved ? 'PUBLISH' : 'UPDATE', 'TESTIMONIAL', id, { approved });
             return NextResponse.json({ success: true });
         } else {
@@ -74,6 +76,8 @@ export async function DELETE(req: Request) {
 
         if (result.success) {
             revalidatePath('/');
+            revalidatePath('/testimonials', 'layout');
+            try { revalidateTag('testimonials', 'max'); } catch {}
             await recordAuditTrail('DELETE', 'TESTIMONIAL', id);
             return NextResponse.json({ success: true });
         } else {
@@ -105,6 +109,8 @@ export async function POST(req: Request) {
 
         if (result.success) {
             revalidatePath('/');
+            revalidatePath('/testimonials', 'layout');
+            try { revalidateTag('testimonials', 'max'); } catch {}
             await recordAuditTrail('CREATE', 'TESTIMONIAL', result.id || 'unknown', {
                 source: body.source || 'admin',
                 approved: true,

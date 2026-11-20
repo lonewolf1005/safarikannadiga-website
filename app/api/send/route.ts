@@ -21,6 +21,11 @@ export async function POST(request: Request) {
 
         const { email, firstName, lastName, interest, message, type } = body;
 
+        // Basic input validation
+        if (!email || typeof email !== 'string' || !email.includes('@')) {
+            return NextResponse.json({ error: 'A valid email address is required' }, { status: 400 });
+        }
+
         let subject = '';
         let htmlContent = '';
 

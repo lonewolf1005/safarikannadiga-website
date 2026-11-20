@@ -9,12 +9,13 @@ export async function GET(req: Request) {
     const key = searchParams.get('key');
     const cronSecret = process.env.CRON_SECRET;
 
-    // Simple security check
-    if (key !== cronSecret && req.headers.get('Authorization') !== `Bearer ${cronSecret}`) {
-        // Allow if no secret configured in dev
-        if (process.env.NODE_ENV === 'production' && cronSecret) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+    // Security check: in production, require configured CRON_SECRET and matching key/header
+    const isAuthorized = cronSecret && (
+        key === cronSecret || req.headers.get('Authorization') === `Bearer ${cronSecret}`
+    );
+
+    if (process.env.NODE_ENV === 'production' && !isAuthorized) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Run syncs in parallel

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import ImageEditorModal from './ImageEditorModal';
 
@@ -14,6 +14,16 @@ interface UploadQueueModalProps {
 
 export function UploadQueueModal({ files, isOpen, onClose, onUpload, onFilesChange }: UploadQueueModalProps) {
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+
+    useEffect(() => {
+        const urls = files.map(file => URL.createObjectURL(file));
+        setPreviewUrls(urls);
+
+        return () => {
+            urls.forEach(url => URL.revokeObjectURL(url));
+        };
+    }, [files]);
 
     const handleRemoveFile = (index: number) => {
         const newFiles = [...files];
@@ -56,12 +66,14 @@ export function UploadQueueModal({ files, isOpen, onClose, onUpload, onFilesChan
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                         {files.map((file, idx) => (
                             <div key={`${file.name}-${idx}`} className="group relative aspect-square bg-gray-100 rounded-2xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all">
-                                <Image
-                                    src={URL.createObjectURL(file)}
-                                    alt={file.name}
-                                    fill
-                                    className="object-cover"
-                                />
+                                {previewUrls[idx] && (
+                                    <Image
+                                        src={previewUrls[idx]}
+                                        alt={file.name}
+                                        fill
+                                        className="object-cover"
+                                    />
+                                )}
 
                                 {/* Overlay Actions */}
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px]">

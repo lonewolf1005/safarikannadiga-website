@@ -33,9 +33,15 @@ export function TestimonialsAdmin() {
         try {
             const res = await fetch('/api/admin/testimonials');
             const data = await res.json();
-            setTestimonials(data);
+            if (res.ok && Array.isArray(data)) {
+                setTestimonials(data);
+            } else {
+                console.error('Failed to fetch testimonials:', data);
+                setTestimonials([]);
+            }
         } catch (error) {
             console.error('Failed to fetch testimonials:', error);
+            setTestimonials([]);
         } finally {
             setLoading(false);
         }

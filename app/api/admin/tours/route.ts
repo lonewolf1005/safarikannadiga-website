@@ -85,6 +85,7 @@ export async function POST(req: Request) {
         if (result.success) {
             revalidatePath('/', 'layout');
             revalidatePath('/tours', 'layout');
+            revalidatePath('/upcoming-tours', 'layout');
             await recordAuditTrail('CREATE', 'TOUR', result.tour?.id || tourData.title, {
                 title: tourData.title,
                 destination: tourData.destination,
@@ -128,7 +129,7 @@ export async function PUT(req: Request) {
         if ('status' in body) updates.status = body.status;
         if ('featured' in body) updates.featured = !!body.featured;
         if ('brochure_url' in body) updates.brochure_url = body.brochure_url;
-        if (body.image_url) updates.image_url = body.image_url;
+        if ('image_url' in body) updates.image_url = body.image_url;
 
         if (updates.start_date && updates.end_date && !isValidDateRange(updates.start_date, updates.end_date)) {
             return NextResponse.json({ error: 'End date cannot be before the start date' }, { status: 400 });
@@ -147,6 +148,7 @@ export async function PUT(req: Request) {
         if (result.success) {
             revalidatePath('/', 'layout');
             revalidatePath('/tours', 'layout');
+            revalidatePath('/upcoming-tours', 'layout');
             await recordAuditTrail('UPDATE', 'TOUR', id, updates);
             return NextResponse.json({ success: true });
         } else {
@@ -190,6 +192,7 @@ export async function PATCH(req: Request) {
         if (result.success) {
             revalidatePath('/', 'layout');
             revalidatePath('/tours', 'layout');
+            revalidatePath('/upcoming-tours', 'layout');
             await recordAuditTrail('UPDATE', 'TOUR', id, { action });
             return NextResponse.json({ success: true });
         } else {
@@ -220,6 +223,7 @@ export async function DELETE(req: Request) {
         if (result.success) {
             revalidatePath('/', 'layout');
             revalidatePath('/tours', 'layout');
+            revalidatePath('/upcoming-tours', 'layout');
             await recordAuditTrail('DELETE', 'TOUR', id);
             return NextResponse.json({ success: true });
         } else {

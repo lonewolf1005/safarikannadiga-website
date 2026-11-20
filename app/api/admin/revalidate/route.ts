@@ -26,6 +26,8 @@ export async function POST(req: Request) {
         revalidatePath('/');
         revalidatePath('/gallery', 'layout');
         revalidatePath('/tours', 'layout');
+        revalidatePath('/upcoming-tours', 'layout');
+        revalidatePath('/testimonials', 'layout');
         
         return NextResponse.json({ 
             revalidated: true, 

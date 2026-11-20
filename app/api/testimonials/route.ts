@@ -19,11 +19,11 @@ export async function GET(req: Request) {
 
         const testimonials = await getApprovedTestimonials(limit ? parseInt(limit) : undefined);
 
-        // Cache response for 1 hour to reduce Firestore reads
+        // Short cache to balance fast reflection with Firestore protection
         const response = NextResponse.json(testimonials);
         response.headers.set(
             'Cache-Control',
-            'public, s-maxage=3600, stale-while-revalidate=86400'
+            'public, s-maxage=60, stale-while-revalidate=300'
         );
         return response;
     } catch (error) {

@@ -527,12 +527,14 @@ export function GalleryManager({ structure: initialStructure, fetchStructure, se
             };
         }));
 
+        const locationId = activeLocation.id || `${activeContinent?.slug}-${activeLocation.slug}`;
+
         try {
             const res = await fetch('/api/admin/locations/featured', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    locationId: activeLocation.id,
+                    locationId,
                     isFeatured: newState
                 }),
             });

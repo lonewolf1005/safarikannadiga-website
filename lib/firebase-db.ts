@@ -322,6 +322,38 @@ export async function deleteGalleryImageFromDB(fileId: string): Promise<{ succes
     }
 }
 
+export async function deleteGalleryImagesByLocationFromDB(locationName: string, folderPrefix?: string): Promise<{ success: boolean; deletedCount?: number; error?: string }> {
+    try {
+        if (!isFirebaseConfigured()) return { success: true, deletedCount: 0 };
+        const db = getFirebaseDb();
+        const snapshot = await db.collection('gallery_images').get();
+        const batch = db.batch();
+        let count = 0;
+
+        snapshot.docs.forEach((doc) => {
+            const data = doc.data();
+            const matchesName = data.location_name && data.location_name.toLowerCase().trim() === locationName.toLowerCase().trim();
+            const matchesFolder = folderPrefix && data.folder_path && data.folder_path.toLowerCase().startsWith(folderPrefix.toLowerCase());
+
+            if (matchesName || matchesFolder) {
+                batch.delete(doc.ref);
+                count++;
+            }
+        });
+
+        if (count > 0) {
+            await batch.commit();
+            revalidateTag('gallery', 'max');
+        }
+
+        return { success: true, deletedCount: count };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to delete location images';
+        console.error('Error deleting location images:', error);
+        return { success: false, error: message };
+    }
+}
+
 export async function getVisitCount(): Promise<number> {
     if (!isFirebaseConfigured()) return 0;
 
@@ -332,17 +364,13 @@ export async function getVisitCount(): Promise<number> {
 export async function incrementVisitCount(): Promise<{ success: boolean; count?: number; error?: string }> {
     try {
         const ref = getFirebaseDb().collection('site_stats').doc('main');
-        const count = await getFirebaseDb().runTransaction(async (transaction) => {
-            const doc = await transaction.get(ref);
-            const nextCount = Number(doc.data()?.visit_count || 0) + 1;
-            transaction.set(ref, {
-                visit_count: nextCount,
-                updated_at: FieldValue.serverTimestamp(),
-            }, { merge: true });
-            return nextCount;
-        });
+        await ref.set({
+            visit_count: FieldValue.increment(1),
+            updated_at: FieldValue.serverTimestamp(),
+        }, { merge: true });
 
-        return { success: true, count };
+        const doc = await ref.get();
+        return { success: true, count: Number(doc.data()?.visit_count || 1) };
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to increment visit count';
         return { success: false, error: message };

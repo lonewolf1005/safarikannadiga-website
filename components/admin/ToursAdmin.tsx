@@ -52,9 +52,15 @@ export function ToursAdmin() {
         try {
             const res = await fetch('/api/admin/tours');
             const data = await res.json();
-            setTours(data);
+            if (res.ok && Array.isArray(data)) {
+                setTours(data);
+            } else {
+                console.error('Failed to fetch tours:', data);
+                setTours([]);
+            }
         } catch (error) {
             console.error('Failed to fetch tours:', error);
+            setTours([]);
         } finally {
             setLoading(false);
         }
@@ -193,7 +199,7 @@ export function ToursAdmin() {
                 imageUrl = uploadData.url;
             }
 
-            const payload = {
+            const payload: any = {
                 id: editingTour?.id,
                 title: formData.title,
                 destination: formData.destination,
@@ -206,8 +212,14 @@ export function ToursAdmin() {
                 brochure_url: formData.brochure_url,
                 status: formData.status,
                 featured: formData.featured,
-                image_url: imageUrl,
             };
+
+            // If a new image was uploaded, assign it; if image was cleared, assign null; if unchanged, leave existing
+            if (imageUrl) {
+                payload.image_url = imageUrl;
+            } else if (editingTour && !imagePreview) {
+                payload.image_url = null;
+            }
 
             const res = await fetch('/api/admin/tours', {
                 method: editingTour ? 'PUT' : 'POST',
@@ -588,8 +600,20 @@ export function ToursAdmin() {
                                     <label className="block text-sm font-semibold text-gray-700 mb-1">Tour Image</label>
                                     <div className="flex items-center gap-4">
                                         {imagePreview && (
-                                            <div className="w-24 h-24 relative rounded-lg overflow-hidden">
-                                                <Image src={imagePreview} alt="Preview" fill className="object-cover" sizes="96px" />
+                                            <div className="relative">
+                                                <div className="w-24 h-24 relative rounded-lg overflow-hidden border border-gray-200">
+                                                    <Image src={imagePreview} alt="Preview" fill className="object-cover" sizes="96px" />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setImagePreview(''); setImageFile(null); }}
+                                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow hover:bg-red-600 transition-colors"
+                                                    title="Remove image"
+                                                >
+                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
                                             </div>
                                         )}
                                         <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg font-semibold text-gray-700 flex items-center gap-2">

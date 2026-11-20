@@ -35,6 +35,7 @@ import {
     getLocationsFromDB,
     addLocationToDB,
     deleteLocationFromDB,
+    deleteGalleryImagesByLocationFromDB,
     updateLocationInDB,
     getCoversFromDB,
     setCoverInDB,
@@ -262,7 +263,9 @@ async function getGalleryConfig() {
                 slug: loc.slug,
                 country: loc.country,
                 description: loc.description,
-                wildlife: loc.wildlife || []
+                wildlife: loc.wildlife || [],
+                is_featured: loc.is_featured ?? false,
+                featured_order: loc.featured_order ?? 0,
             });
         });
 
@@ -669,6 +672,7 @@ export async function getFullGalleryStructure() {
             const savedContinentCover = savedContinentCoverData?.cover_url;
 
             return {
+                id: loc.id,
                 name: loc.name,
                 slug: loc.slug,
                 country: loc.country,
@@ -963,7 +967,7 @@ export async function deleteLocation(
         }
 
         // Delete all images from ImageKit folder
-        const folderPath = getLocationFolderPath(continent.name, location.name);
+        const folderPath = getLocationFolderPath(continent.name, location.name, location.country);
         try {
             await deleteFolder(folderPath);
         } catch (e) {
@@ -975,6 +979,8 @@ export async function deleteLocation(
         const coverKey = `${continent.name}/${location.name}`;
         if (isFirebaseConfigured()) {
             await deleteCoverFromDB(coverKey);
+            // Clean up all associated image records from Firestore
+            await deleteGalleryImagesByLocationFromDB(location.name, folderPath);
             // Delete location from DB
             const locationId = `${continentSlug}-${locationSlug}`;
             const result = await deleteLocationFromDB(locationId);
@@ -1197,21 +1203,22 @@ export async function syncImageKitWithFirestore(): Promise<{ success: boolean; a
 
         for (const file of ikFiles) {
             if (!existingIds.has(file.fileId)) {
-                const pathParts = file.filePath.split('/').filter(Boolean); // ['safari-gallery', 'Africa', ...]
-                let continentName = undefined;
-                let country = undefined;
-                let locationName = undefined;
+                const lastSlash = file.filePath.lastIndexOf('/');
+                const folderPath = lastSlash !== -1 ? file.filePath.substring(0, lastSlash) : '';
+                const folderSegments = folderPath.split('/').filter(Boolean);
 
-                if (pathParts.length >= 4) {
-                    continentName = pathParts[1];
-                    country = pathParts[2];
-                    locationName = pathParts[3];
-                } else if (pathParts.length === 3) {
-                    continentName = pathParts[1];
-                    locationName = pathParts[2];
+                let continentName: string | undefined = undefined;
+                let country: string | undefined = undefined;
+                let locationName: string | undefined = undefined;
+
+                if (folderSegments.length >= 4) {
+                    continentName = folderSegments[1];
+                    country = folderSegments[2];
+                    locationName = folderSegments[3];
+                } else if (folderSegments.length === 3) {
+                    continentName = folderSegments[1];
+                    locationName = folderSegments[2];
                 }
-
-                const folderPath = file.filePath.substring(0, file.filePath.lastIndexOf('/'));
 
                 await addGalleryImageToDB({
                     file_id: file.fileId,
