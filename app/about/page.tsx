@@ -4,13 +4,52 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-    title: 'About Us | SafariKannadiga - Wildlife Safari Tours',
-    description: 'Learn about SafariKannadiga, founded by Tilak Raj. We create unforgettable wildlife safari experiences connecting people to nature across Africa and Asia.',
+    title: 'About Safari Kannadiga | Led by Tilak Raj - Africa Wildlife Tours',
+    description: 'Meet Safari Kannadiga and founder Tilak Raj. Specializing in ethical, photographer-led wildlife safaris and vacation tours across Kenya, Tanzania, Uganda, Namibia, and India.',
+    alternates: {
+        canonical: '/about',
+    },
+    openGraph: {
+        title: 'About Safari Kannadiga | Led by Tilak Raj',
+        description: 'Meet Safari Kannadiga and founder Tilak Raj. Specializing in ethical, photographer-led wildlife safaris.',
+        url: 'https://safarikannadiga.com/about',
+        images: [{ url: '/images/about-hero.jpg', alt: 'About Safari Kannadiga' }],
+    },
 };
 
 export default function AboutPage() {
+    const breadcrumbSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+            { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://safarikannadiga.com' },
+            { '@type': 'ListItem', 'position': 2, 'name': 'About Us', 'item': 'https://safarikannadiga.com/about' }
+        ]
+    };
+
+    const personSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'Person',
+        'name': 'Tilak Raj',
+        'jobTitle': 'Founder & Wildlife Photographer',
+        'worksFor': {
+            '@type': 'TravelAgency',
+            'name': 'Safari Kannadiga',
+            'url': 'https://safarikannadiga.com'
+        },
+        'description': 'ICT and management professional turned wildlife photographer and naturalist, curating bespoke African safari expeditions.'
+    };
+
     return (
         <div className="pt-24 md:pt-32">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+            />
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(personSchema) }}
+            />
             {/* Hero */}
             <section className="relative min-h-[50vh] flex items-center justify-center mb-16">
                 <Image

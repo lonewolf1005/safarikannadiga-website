@@ -5,9 +5,35 @@ export const revalidate = 3600; // 1 hour in seconds
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { Container } from '@/components/ui/Container';
 import { getContinents, getContinent, GalleryLocation } from '@/lib/gallery-cloud';
 import { toSlug } from '@/lib/utils/slugify';
+
+// Generate dynamic SEO metadata
+export async function generateMetadata({ params }: { params: Promise<{ continent: string }> }): Promise<Metadata> {
+    const { continent: continentSlug } = await params;
+    const continent = await getContinent(continentSlug);
+    if (!continent) return { title: 'Wildlife Photo Gallery' };
+
+    const continentTitle = `${continent.name} Wildlife Photography & Safari Destinations`;
+    const topDestinations = continent.locations.slice(0, 4).map(l => l.name).join(', ');
+    const continentDesc = `Explore award-winning wildlife photography and luxury safari tour destinations across ${continent.name}, featuring ${topDestinations}.`;
+
+    return {
+        title: continentTitle,
+        description: continentDesc,
+        openGraph: {
+            title: `${continentTitle} | Safari Kannadiga`,
+            description: continentDesc,
+            url: `https://safarikannadiga.com/gallery/${continentSlug}`,
+            images: continent.coverImage ? [{ url: continent.coverImage, alt: continentTitle }] : undefined,
+        },
+        alternates: {
+            canonical: `/gallery/${continentSlug}`,
+        },
+    };
+}
 
 // Generate static params for all continents at build time
 export async function generateStaticParams() {
@@ -64,8 +90,22 @@ export default async function ContinentGalleryPage({ params }: { params: Promise
         return a.name.localeCompare(b.name); // Alphabetical within each group
     });
 
+    const breadcrumbSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+            { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://safarikannadiga.com' },
+            { '@type': 'ListItem', 'position': 2, 'name': 'Gallery', 'item': 'https://safarikannadiga.com/gallery' },
+            { '@type': 'ListItem', 'position': 3, 'name': continent.name, 'item': `https://safarikannadiga.com/gallery/${continent.slug}` }
+        ]
+    };
+
     return (
         <section className="pt-32 pb-20 bg-neutral-cream min-h-screen">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+            />
             <Container>
                 {/* Header */}
                 <div className="mb-12">

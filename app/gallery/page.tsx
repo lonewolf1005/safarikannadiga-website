@@ -5,8 +5,16 @@ import { getContinents } from '@/lib/gallery-cloud';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-    title: 'Wildlife Photo Gallery',
-    description: 'Browse stunning wildlife photography from SafariKannadiga expeditions across Africa and Asia. Lions, tigers, elephants, and more.',
+    title: 'African Wildlife Photography Gallery & Safari Destinations',
+    description: 'Explore high-resolution wildlife photography and iconic safari destinations across Kenya, Tanzania, Uganda, Namibia, and India. Curated by Safari Kannadiga.',
+    alternates: {
+        canonical: '/gallery',
+    },
+    openGraph: {
+        title: 'African Wildlife Photography Gallery & Safari Destinations | Safari Kannadiga',
+        description: 'Explore high-resolution wildlife photography and iconic safari destinations across Kenya, Tanzania, Uganda, Namibia, and India.',
+        url: 'https://safarikannadiga.com/gallery',
+    },
 };
 
 // ISR: Revalidate every 1 hour to balance freshness with Firestore read costs
@@ -16,8 +24,21 @@ export const revalidate = 3600; // 1 hour in seconds
 export default async function GalleryPage() {
     const continents = await getContinents();
 
+    const breadcrumbSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+            { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://safarikannadiga.com' },
+            { '@type': 'ListItem', 'position': 2, 'name': 'Gallery', 'item': 'https://safarikannadiga.com/gallery' }
+        ]
+    };
+
     return (
         <section className="pt-32 pb-20 bg-neutral-cream min-h-screen">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+            />
             <Container>
                 {/* Header */}
                 <div className="text-center max-w-3xl mx-auto mb-16">

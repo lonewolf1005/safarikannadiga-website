@@ -2,11 +2,42 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { Container } from '@/components/ui/Container';
 import { getContinents, getContinent } from '@/lib/gallery-cloud';
 import { toSlug } from '@/lib/utils/slugify';
 
 export const revalidate = 3600; // ISR: Revalidate every hour
+
+export async function generateMetadata({ params }: { params: Promise<{ continent: string; country: string }> }): Promise<Metadata> {
+    const { continent: continentSlug, country: countrySlug } = await params;
+    const continent = await getContinent(continentSlug);
+    if (!continent) return { title: 'Country Wildlife Gallery' };
+
+    const locations = continent.locations.filter(loc =>
+        toSlug(loc.country || 'other-destinations') === countrySlug
+    );
+    const countryName = locations[0]?.country || countrySlug.replace(/-/g, ' ');
+    const title = `${countryName} Wildlife Safari & Photography Destinations`;
+    const locNames = locations.slice(0, 4).map(l => l.name).join(', ');
+    const description = `Explore extraordinary wildlife photography and guided safari tours in ${countryName}, featuring ${locNames}. Curated by Safari Kannadiga.`;
+
+    const coverImage = locations.find(l => l.coverImage && !l.coverImage.includes('placeholder'))?.coverImage;
+
+    return {
+        title,
+        description,
+        openGraph: {
+            title: `${title} | Safari Kannadiga`,
+            description,
+            url: `https://safarikannadiga.com/gallery/${continentSlug}/${countrySlug}`,
+            images: coverImage ? [{ url: coverImage, alt: title }] : undefined,
+        },
+        alternates: {
+            canonical: `/gallery/${continentSlug}/${countrySlug}`,
+        },
+    };
+}
 
 export async function generateStaticParams() {
     const continents = await getContinents();
@@ -41,8 +72,23 @@ export default async function CountryGalleryPage({ params }: { params: Promise<{
     // Get country name from first matching location
     const countryName = locations[0].country || 'Other Destinations';
 
+    const breadcrumbSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+            { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://safarikannadiga.com' },
+            { '@type': 'ListItem', 'position': 2, 'name': 'Gallery', 'item': 'https://safarikannadiga.com/gallery' },
+            { '@type': 'ListItem', 'position': 3, 'name': continent.name, 'item': `https://safarikannadiga.com/gallery/${continentSlug}` },
+            { '@type': 'ListItem', 'position': 4, 'name': countryName, 'item': `https://safarikannadiga.com/gallery/${continentSlug}/${countrySlug}` }
+        ]
+    };
+
     return (
         <section className="pt-32 pb-20 bg-neutral-cream min-h-screen">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+            />
             <Container>
                 {/* Breadcrumb */}
                 <div className="mb-8">

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { Container } from '@/components/ui/Container';
 import { getContinents, getContinent, getLocation, getImages } from '@/lib/gallery-cloud';
 import GalleryLocationClient from '@/components/gallery/GalleryLocationClient';
@@ -10,6 +11,33 @@ import { toSlug } from '@/lib/utils/slugify';
 // Force dynamic rendering to ensure cover photo changes reflect immediately
 // Enable ISR with 1-hour cache
 export const revalidate = 3600;
+
+export async function generateMetadata({ params }: { params: Promise<{ continent: string; country: string; location: string }> }): Promise<Metadata> {
+    const { continent: continentSlug, country: countrySlug, location: locationSlug } = await params;
+    const location = await getLocation(continentSlug, locationSlug);
+    if (!location) return { title: 'Wildlife Photo Gallery' };
+
+    const countryName = location.country || countrySlug.replace(/-/g, ' ');
+    const title = `${location.name} Wildlife Photography & Safari Gallery | ${countryName}`;
+    const wildlifeList = location.wildlife && location.wildlife.length > 0 ? ` featuring ${location.wildlife.slice(0, 4).join(', ')}` : '';
+    const description = `View high-resolution wildlife photos captured in ${location.name}, ${countryName}${wildlifeList}. Expert-guided photographic safaris by Safari Kannadiga.`;
+
+    const coverUrl = location.coverImage && !location.coverImage.includes('placeholder') ? location.coverImage : undefined;
+
+    return {
+        title,
+        description,
+        openGraph: {
+            title: `${title} | Safari Kannadiga`,
+            description,
+            url: `https://safarikannadiga.com/gallery/${continentSlug}/${countrySlug}/${locationSlug}`,
+            images: coverUrl ? [{ url: coverUrl, alt: `${location.name} Wildlife Photography` }] : undefined,
+        },
+        alternates: {
+            canonical: `/gallery/${continentSlug}/${countrySlug}/${locationSlug}`,
+        },
+    };
+}
 
 // Generate static params for all locations at build time
 export async function generateStaticParams() {
@@ -47,8 +75,45 @@ export default async function LocationGalleryPage({ params }: { params: Promise<
     const images = await getImages(continentSlug, locationSlug);
     const coverImage = location.coverImage || '/images/placeholder-safari.jpg';
 
+    const breadcrumbSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+            { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://safarikannadiga.com' },
+            { '@type': 'ListItem', 'position': 2, 'name': 'Gallery', 'item': 'https://safarikannadiga.com/gallery' },
+            { '@type': 'ListItem', 'position': 3, 'name': continent.name, 'item': `https://safarikannadiga.com/gallery/${continentSlug}` },
+            { '@type': 'ListItem', 'position': 4, 'name': location.country || 'Destinations', 'item': `https://safarikannadiga.com/gallery/${continentSlug}/${countrySlug}` },
+            { '@type': 'ListItem', 'position': 5, 'name': location.name, 'item': `https://safarikannadiga.com/gallery/${continentSlug}/${countrySlug}/${locationSlug}` }
+        ]
+    };
+
+    const destinationSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'TouristDestination',
+        'name': location.name,
+        'description': location.description,
+        'containedInPlace': {
+            '@type': 'Country',
+            'name': location.country || continent.name
+        },
+        'image': coverImage,
+        'touristType': ['Wildlife Enthusiasts', 'Nature Photographers', 'Safari Travelers'],
+        'includesAttraction': location.wildlife?.map(animal => ({
+            '@type': 'TouristAttraction',
+            'name': `${animal} in ${location.name}`
+        }))
+    };
+
     return (
         <section className="pt-32 pb-20 bg-neutral-cream min-h-screen">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+            />
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(destinationSchema) }}
+            />
             <Container>
                 {/* Breadcrumb */}
                 <div className="mb-8">

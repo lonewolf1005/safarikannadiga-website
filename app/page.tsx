@@ -2,6 +2,7 @@ import { Hero } from '@/components/sections/Hero';
 import { FeaturedDestinations } from '@/components/sections/FeaturedTours';
 import { UpcomingTours } from '@/components/sections/UpcomingTours';
 import { WhyChooseUs } from '@/components/sections/WhyChooseUs';
+import { SafariFAQ } from '@/components/sections/SafariFAQ';
 import { TestimonialsSection, ShareExperienceSection } from '@/components/sections/TestimonialsSection';
 import { getGeneralSettings } from '@/lib/content';
 import { getFeaturedLocations, getContinents } from '@/lib/gallery-cloud';
@@ -33,6 +34,7 @@ export default async function HomePage() {
             <TestimonialsSection />
             <UpcomingTours />
             <WhyChooseUs stats={stats} />
+            <SafariFAQ />
             <ShareExperienceSection />
         </div>
     );

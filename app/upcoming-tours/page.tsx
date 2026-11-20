@@ -5,13 +5,34 @@ import type { Metadata } from 'next';
 export const revalidate = 3600; // 1 hour in seconds
 
 export const metadata: Metadata = {
-    title: 'Upcoming Tours',
-    description: 'Browse upcoming wildlife safari tours with SafariKannadiga. Join our group departures to Kenya, India, and more. Limited seats available.',
+    title: 'Upcoming Wildlife Safari Tours & Departures | Kenya, Tanzania & Uganda',
+    description: 'Join scheduled group departures and guided photography tours to Masai Mara, Serengeti, and Amboseli. Expert naturalists, limited vehicle seats.',
+    alternates: {
+        canonical: '/upcoming-tours',
+    },
+    openGraph: {
+        title: 'Upcoming Wildlife Safari Tours & Departures | Safari Kannadiga',
+        description: 'Join scheduled group departures and guided photography tours to Masai Mara, Serengeti, and Amboseli.',
+        url: 'https://safarikannadiga.com/upcoming-tours',
+    },
 };
 
 export default function UpcomingToursPage() {
+    const breadcrumbSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+            { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://safarikannadiga.com' },
+            { '@type': 'ListItem', 'position': 2, 'name': 'Upcoming Tours', 'item': 'https://safarikannadiga.com/upcoming-tours' }
+        ]
+    };
+
     return (
         <div className="pt-24 pb-20">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+            />
             <div className="bg-neutral-cream py-12 mb-8">
                 <Container>
                     <div className="max-w-3xl mx-auto text-center">

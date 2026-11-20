@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
 import { Container } from '@/components/ui/Container';
 import { getAllContent } from '@/lib/content';
 import { normalizeImageUrl } from '@/lib/image-utils';
@@ -11,6 +12,31 @@ interface TourPageProps {
 
 // ISR: Revalidate every 1 hour to reduce Firestore reads
 export const revalidate = 3600; // 1 hour in seconds
+
+export async function generateMetadata({ params }: TourPageProps): Promise<Metadata> {
+    const { slug } = await params;
+    const tours = getAllContent('tours') as any[];
+    const tour = tours.find(t => t.slug === slug);
+    if (!tour) return { title: 'Wildlife Safari Tour' };
+
+    const title = `${tour.title} (${tour.duration}) | Guided African Safari Tour`;
+    const cleanDescription = (tour.excerpt || tour.content?.replace(/<[^>]+>/g, '').slice(0, 160) || `Experience the ultimate African wildlife adventure on the ${tour.title} safari. Expert-led guided safari package with Safari Kannadiga.`).trim();
+    const heroImg = normalizeImageUrl(tour.heroImage);
+
+    return {
+        title,
+        description: cleanDescription,
+        openGraph: {
+            title: `${title} | Safari Kannadiga`,
+            description: cleanDescription,
+            url: `https://safarikannadiga.com/tours/${slug}`,
+            images: heroImg ? [{ url: heroImg, alt: tour.title }] : undefined,
+        },
+        alternates: {
+            canonical: `/tours/${slug}`,
+        },
+    };
+}
 
 export async function generateStaticParams() {
     const tours = getAllContent('tours');
@@ -26,8 +52,46 @@ export default async function TourDetailPage({ params }: TourPageProps) {
         notFound();
     }
 
+    const breadcrumbSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        'itemListElement': [
+            { '@type': 'ListItem', 'position': 1, 'name': 'Home', 'item': 'https://safarikannadiga.com' },
+            { '@type': 'ListItem', 'position': 2, 'name': 'Upcoming Tours', 'item': 'https://safarikannadiga.com/upcoming-tours' },
+            { '@type': 'ListItem', 'position': 3, 'name': tour.title, 'item': `https://safarikannadiga.com/tours/${tour.slug}` }
+        ]
+    };
+
+    const touristTripSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'TouristTrip',
+        'name': tour.title,
+        'description': tour.excerpt || tour.content?.replace(/<[^>]+>/g, '').slice(0, 250),
+        'touristType': ['Wildlife Enthusiasts', 'Photographers', 'Vacationers', 'Nature Lovers'],
+        'provider': {
+            '@type': 'TravelAgency',
+            'name': 'Safari Kannadiga',
+            'url': 'https://safarikannadiga.com'
+        },
+        'image': normalizeImageUrl(tour.heroImage),
+        'offers': {
+            '@type': 'Offer',
+            'availability': 'https://schema.org/InStock',
+            'url': `https://safarikannadiga.com/tours/${tour.slug}`,
+            'priceCurrency': 'USD'
+        }
+    };
+
     return (
         <div className="pt-24 pb-20">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+            />
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(touristTripSchema) }}
+            />
             {/* Hero Section */}
             <div className="relative h-[60vh] min-h-[400px]">
                 <Image
