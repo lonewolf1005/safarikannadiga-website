@@ -40,10 +40,29 @@ export default async function ContinentGalleryPage({ params }: { params: Promise
         }
         acc[countrySlug].locations.push(loc);
         acc[countrySlug].imageCount += loc.imageCount;
+
+        // If current cover is a placeholder, prefer any location with a real cover image
+        if ((!acc[countrySlug].coverImage || acc[countrySlug].coverImage.includes('placeholder')) &&
+            loc.coverImage && !loc.coverImage.includes('placeholder')) {
+            acc[countrySlug].coverImage = loc.coverImage;
+        }
+
         return acc;
     }, {} as Record<string, { name: string; slug: string; locations: GalleryLocation[]; imageCount: number; coverImage: string }>);
 
-    const countries = Object.values(countriesMap).sort((a, b) => a.name.localeCompare(b.name));
+    // Content-Based Country Ordering:
+    // Group 1: Countries with published content (imageCount > 0), sorted alphabetically
+    // Group 2: Countries without published content (imageCount === 0), sorted alphabetically
+    const countries = Object.values(countriesMap).sort((a, b) => {
+        const aHasContent = a.imageCount > 0 ? 1 : 0;
+        const bHasContent = b.imageCount > 0 ? 1 : 0;
+
+        if (aHasContent !== bHasContent) {
+            return bHasContent - aHasContent; // Countries with content first
+        }
+
+        return a.name.localeCompare(b.name); // Alphabetical within each group
+    });
 
     return (
         <section className="pt-32 pb-20 bg-neutral-cream min-h-screen">
@@ -79,50 +98,69 @@ export default async function ContinentGalleryPage({ params }: { params: Promise
 
                 {/* Country Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {countries.map((country, idx) => (
-                        <Link
-                            key={country.slug}
-                            href={`/gallery/${continentSlug}/${country.slug}`} // Link to Country Page
-                            className="group block bg-white rounded-card overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1"
-                        >
-                            <div className="relative aspect-[4/3] overflow-hidden">
-                                <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110">
-                                    <Image
-                                        src={country.coverImage} // First location cover
-                                        alt={country.name}
-                                        fill
-                                        className="object-cover"
-                                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                                        priority={idx < 3}
-                                    />
-                                </div>
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    {countries.map((country, idx) => {
+                        const isComingSoon = country.imageCount === 0;
 
-                                {/* Destination Count Badge */}
-                                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-neutral-charcoal px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                    </svg>
-                                    {country.locations.length} Parks
-                                </div>
-                            </div>
+                        return (
+                            <Link
+                                key={country.slug}
+                                href={`/gallery/${continentSlug}/${country.slug}`} // Link to Country Page
+                                className="group block bg-white rounded-card overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1"
+                            >
+                                <div className="relative aspect-[4/3] overflow-hidden">
+                                    <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110">
+                                        <Image
+                                            src={country.coverImage || '/images/placeholder-safari.jpg'}
+                                            alt={country.name}
+                                            fill
+                                            className={`object-cover ${isComingSoon ? 'opacity-85' : ''}`}
+                                            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                            priority={idx < 3}
+                                        />
+                                    </div>
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                            <div className="p-6">
-                                <h3 className="text-2xl font-bold font-heading text-neutral-charcoal mb-2 group-hover:text-safari-gold transition-colors">
-                                    {country.name}
-                                </h3>
-                                <p className="text-neutral-gray text-sm line-clamp-2">
-                                    Explore {country.locations.length} wildlife destinations in {country.name}.
-                                </p>
-                                <div className="mt-4 flex items-center text-sm font-bold text-safari-gold">
-                                    View Destinations
-                                    <svg className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                    </svg>
+                                    {/* Destination Status Badge */}
+                                    {isComingSoon ? (
+                                        <div className="absolute top-4 right-4 bg-safari-gold text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
+                                            <span>Coming Soon</span>
+                                        </div>
+                                    ) : (
+                                        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-neutral-charcoal px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                            </svg>
+                                            {country.locations.length} Parks
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        </Link>
-                    ))}
+
+                                <div className="p-6">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-2xl font-bold font-heading text-neutral-charcoal group-hover:text-safari-gold transition-colors">
+                                            {country.name}
+                                        </h3>
+                                        {isComingSoon && (
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-safari-gold bg-safari-gold/10 px-2 py-0.5 rounded">
+                                                Coming Soon
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-neutral-gray text-sm line-clamp-2">
+                                        {isComingSoon
+                                            ? `Expeditions and wildlife gallery in ${country.name} coming soon.`
+                                            : `Explore ${country.locations.length} wildlife destinations in ${country.name}.`}
+                                    </p>
+                                    <div className="mt-4 flex items-center text-sm font-bold text-safari-gold">
+                                        {isComingSoon ? 'Preview Destinations' : 'View Destinations'}
+                                        <svg className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </Link>
+                        );
+                    })}
                 </div>
             </Container>
         </section>

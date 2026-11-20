@@ -92,9 +92,9 @@ export function Hero({ title, subtitle, backgroundImage, featuredLocations = [] 
                 <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-black/60 md:bg-gradient-to-t md:from-black/90 md:via-black/40 md:to-transparent z-10" />
             </div>
 
-            <Container className="relative z-20 text-center md:text-right text-white pt-32 md:pt-0 pb-10 md:pb-40">
+            <Container className="relative z-20 text-center text-white pt-32 md:pt-0 pb-16 md:pb-28">
                 <div
-                    className={`max-w-4xl ml-auto transition-all duration-700 ease-out ${isContentVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                    className={`max-w-4xl mx-auto transition-all duration-700 ease-out ${isContentVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                 >
                     <span className="inline-block px-4 py-1.5 mb-6 text-sm font-bold tracking-widest uppercase bg-safari-gold text-white rounded-full shadow-lg">
                         The Ultimate Safari Experience
@@ -102,10 +102,10 @@ export function Hero({ title, subtitle, backgroundImage, featuredLocations = [] 
                     <h1 className="text-4xl md:text-6xl lg:text-7xl font-heading font-bold mb-6 leading-tight text-white drop-shadow-lg">
                         {title}
                     </h1>
-                    <p className="text-lg md:text-xl text-neutral-cream mb-10 max-w-2xl mx-auto md:ml-auto leading-relaxed drop-shadow-md">
+                    <p className="text-lg md:text-xl text-neutral-cream mb-10 max-w-2xl mx-auto leading-relaxed drop-shadow-md">
                         {subtitle}
                     </p>
-                    <div className="flex flex-col sm:flex-row items-center md:items-end justify-center md:justify-end gap-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <Link href="/contact" className="btn-primary px-8 py-4 text-lg w-full sm:w-auto shadow-2xl shadow-safari-gold/20 transform hover:scale-105 border-2 border-transparent">
                             Plan My Safari
                         </Link>

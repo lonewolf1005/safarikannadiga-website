@@ -442,6 +442,25 @@ const fetchContinentsRawCached = unstable_cache(
                     coverImage = savedCover;
                 } else if (images.length > 0) {
                     coverImage = images[0].src;
+                } else {
+                    const slug = (loc.slug || '').toLowerCase();
+                    const localCoverMap: Record<string, string> = {
+                        'bandhavgarh': '/images/gallery-archive/asia/bandhavgarh-cover.jpg',
+                        'bandipur': '/images/gallery-archive/asia/bandipur-cover.jpg',
+                        'corbett': '/images/gallery-archive/asia/jim-corbett-cover.jpg',
+                        'jim-corbett': '/images/gallery-archive/asia/jim-corbett-cover.jpg',
+                        'kabini': '/images/gallery-archive/asia/kabini-cover.jpg',
+                        'kanha': '/images/gallery-archive/asia/kanha-cover.jpg',
+                        'kaziranga': '/images/gallery-archive/asia/kaziranga-cover.jpg',
+                        'ranthambore': '/images/gallery-archive/asia/ranthambore-cover.jpg',
+                        'pench': '/images/gallery-archive/asia/kanha-cover.jpg',
+                        'tadoba': '/images/gallery-archive/asia/bandhavgarh-cover.jpg',
+                        'tsavo': '/images/gallery-archive/chobe-cover.jpg',
+                        'ethosha': '/images/gallery-archive/okavango-cover.jpg',
+                    };
+                    if (localCoverMap[slug]) {
+                        coverImage = localCoverMap[slug];
+                    }
                 }
 
                 return {
