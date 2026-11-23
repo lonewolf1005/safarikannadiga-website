@@ -347,7 +347,7 @@ This project is proprietary software for SafariKannadiga.
 
 ## 👨‍💻 Developer
 
-**Designed & Developed by [Samarth V](https://samarthv.me)**
+**Designed & Developed by [samarthv.dev](https://samarthv.dev)**
 
 ---
 

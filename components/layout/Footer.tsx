@@ -182,12 +182,12 @@ export function Footer({ settings }: FooterProps) {
                     <div className="text-neutral-400 text-xs order-3 md:order-2">
                         Designed & Developed by{' '}
                         <a
-                            href="https://samarthv.me"
+                            href="https://samarthv.dev"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-safari-gold hover:text-white transition-colors font-medium"
                         >
-                            Samarth V
+                            samarthv.dev
                         </a>
                     </div>
                     {/* Changed gap-6 to gap-5 to force hydration fix */}
